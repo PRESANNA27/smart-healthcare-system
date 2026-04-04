@@ -1,0 +1,1680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MediCare REV · Smart Patient Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" crossorigin="anonymous"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=DM+Mono:wght@400;500;600&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+
+<style>
+/* ═══════════════════════════════════════════════════════
+   DESIGN SYSTEM — "REV" — Clinical Brutalism
+   Dark navy base · acid green accent · mono data labels
+═══════════════════════════════════════════════════════ */
+:root {
+  /* Core palette */
+  --ink:        #060d1a;
+  --ink-2:      #0b1829;
+  --ink-3:      #102238;
+  --ink-4:      #162f4f;
+  --ink-5:      #1d3d66;
+  --ink-6:      #264d7e;
+
+  --acid:       #00e676;
+  --acid-dim:   rgba(0,230,118,.12);
+  --acid-glow:  0 0 20px rgba(0,230,118,.25);
+
+  --cyan:       #00b4d8;
+  --cyan-dim:   rgba(0,180,216,.1);
+
+  --amber:      #ffb703;
+  --amber-dim:  rgba(255,183,3,.12);
+
+  --red:        #ef233c;
+  --red-dim:    rgba(239,35,60,.12);
+  --red-glow:   0 0 20px rgba(239,35,60,.3);
+
+  --white:      #ffffff;
+  --slate-1:    #f1f5f9;
+  --slate-2:    #e2e8f0;
+  --slate-3:    #94a3b8;
+  --slate-4:    #475569;
+  --slate-5:    #1e293b;
+
+  /* Typography */
+  --sans:   'DM Sans', system-ui, sans-serif;
+  --mono:   'DM Mono', 'Courier New', monospace;
+  --display:'Syne', var(--sans);
+
+  /* Geometry */
+  --r-sm: 4px;
+  --r:    8px;
+  --r-lg: 14px;
+  --r-xl: 20px;
+
+  /* Shadows */
+  --sh-sm: 0 1px 4px rgba(0,0,0,.3);
+  --sh:    0 4px 20px rgba(0,0,0,.4);
+  --sh-lg: 0 12px 48px rgba(0,0,0,.5);
+
+  /* Transitions */
+  --ease: cubic-bezier(.4,0,.2,1);
+  --trans: .2s var(--ease);
+}
+
+/* ── RESET ─────────────────────────────────── */
+*, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+html { font-size:14px; scroll-behavior:smooth; }
+body {
+  font-family: var(--sans);
+  background: var(--ink);
+  color: var(--white);
+  min-height:100vh;
+  line-height:1.6;
+  overflow-x:hidden;
+}
+
+/* Subtle grid background */
+body::before {
+  content:'';
+  position:fixed; inset:0; z-index:0; pointer-events:none;
+  background-image:
+    linear-gradient(rgba(0,180,216,.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,180,216,.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* ── SCROLLBAR ─────────────────────────────── */
+::-webkit-scrollbar { width:6px; height:6px; }
+::-webkit-scrollbar-track { background:var(--ink-2); }
+::-webkit-scrollbar-thumb { background:var(--ink-5); border-radius:3px; }
+::-webkit-scrollbar-thumb:hover { background:var(--ink-6); }
+
+/* ── TYPOGRAPHY UTILS ─────────────────────── */
+.label {
+  font-family:var(--mono);
+  font-size:9px; font-weight:500;
+  letter-spacing:2.5px; text-transform:uppercase;
+  color: var(--slate-3);
+}
+.tag {
+  display:inline-flex; align-items:center; gap:5px;
+  font-family:var(--mono); font-size:10px; font-weight:500;
+  letter-spacing:1px; text-transform:uppercase;
+  padding:3px 9px; border-radius:var(--r-sm);
+}
+.tag-acid    { background:var(--acid-dim); color:var(--acid); border:1px solid rgba(0,230,118,.2); }
+.tag-red     { background:var(--red-dim);  color:var(--red);  border:1px solid rgba(239,35,60,.2); animation:blink .9s ease infinite; }
+.tag-amber   { background:var(--amber-dim); color:var(--amber); border:1px solid rgba(255,183,3,.2); }
+.tag-cyan    { background:var(--cyan-dim); color:var(--cyan);  border:1px solid rgba(0,180,216,.2); }
+.tag-grey    { background:rgba(71,85,105,.2); color:var(--slate-3); border:1px solid rgba(71,85,105,.3); }
+
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.4} }
+@keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.03)} }
+@keyframes slide-up   { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:none} }
+@keyframes fade-in    { from{opacity:0} to{opacity:1} }
+@keyframes spin       { to{transform:rotate(360deg)} }
+@keyframes sweep-line {
+  0%   { top:10%; opacity:0; }
+  5%   { opacity:1; }
+  95%  { opacity:1; }
+  100% { top:90%; opacity:0; }
+}
+
+/* ══════════════════════════════════════════════
+   HEADER
+══════════════════════════════════════════════ */
+.hdr {
+  position:sticky; top:0; z-index:300;
+  background: rgba(6,13,26,.92);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(0,180,216,.15);
+  height:60px;
+  display:flex; align-items:center;
+  padding:0 28px; gap:20px;
+}
+
+.hdr-cross {
+  width:36px; height:36px; flex-shrink:0;
+  background: var(--red);
+  border-radius:var(--r);
+  display:flex; align-items:center; justify-content:center;
+  font-size:18px;
+  box-shadow: var(--red-glow);
+}
+
+.hdr-title { flex-shrink:0; }
+.hdr-title h1 {
+  font-family:var(--display);
+  font-size:18px; font-weight:800;
+  letter-spacing:2px; text-transform:uppercase;
+  color:var(--white);
+}
+.hdr-title .sub {
+  font-family:var(--mono);
+  font-size:9px; color:var(--slate-4);
+  letter-spacing:3px; text-transform:uppercase;
+  margin-top:-2px;
+}
+
+.hdr-sep { width:1px; height:28px; background:var(--ink-5); flex-shrink:0; }
+
+/* Active patient chip */
+.hdr-active {
+  flex:1; display:flex; align-items:center; gap:10px;
+}
+.hdr-active-chip {
+  display:flex; align-items:center; gap:10px;
+  background: var(--ink-3);
+  border:1px solid var(--ink-5);
+  border-radius:var(--r-lg);
+  padding:6px 16px;
+  animation: fade-in .3s ease;
+}
+.hdr-active-dot {
+  width:8px; height:8px; border-radius:50%;
+  background:var(--acid);
+  box-shadow: 0 0 8px var(--acid);
+  animation:blink 2s ease infinite;
+}
+.hdr-active-id {
+  font-family:var(--mono); font-size:11px; font-weight:600;
+  color:var(--cyan); letter-spacing:1.5px;
+}
+.hdr-active-name {
+  font-size:13px; font-weight:600; color:var(--white);
+}
+.hdr-no-active {
+  font-family:var(--mono); font-size:11px;
+  color:var(--slate-4); letter-spacing:1px;
+}
+
+/* Clock + status */
+.hdr-right { display:flex; align-items:center; gap:10px; flex-shrink:0; }
+.clock {
+  font-family:var(--mono);
+  font-size:16px; font-weight:600; letter-spacing:2px;
+  color:var(--white);
+  background:var(--ink-3);
+  border:1px solid var(--ink-5);
+  padding:5px 12px; border-radius:var(--r);
+}
+.esp-status {
+  display:flex; align-items:center; gap:6px;
+  padding:5px 12px; border-radius:20px;
+  font-family:var(--mono); font-size:10px; font-weight:500;
+  letter-spacing:1px; text-transform:uppercase;
+  transition: all var(--trans);
+}
+.esp-status.on   { background:var(--acid-dim); color:var(--acid); border:1px solid rgba(0,230,118,.2); }
+.esp-status.off  { background:rgba(71,85,105,.15); color:var(--slate-3); border:1px solid rgba(71,85,105,.2); }
+.esp-status.err  { background:var(--red-dim); color:var(--red); border:1px solid rgba(239,35,60,.2); }
+.esp-status .s-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+.esp-status.on .s-dot  { background:var(--acid); box-shadow:0 0 6px var(--acid); animation:blink 1.6s ease infinite; }
+.esp-status.off .s-dot { background:var(--slate-4); }
+.esp-status.err .s-dot { background:var(--red); animation:blink .8s ease infinite; }
+
+/* ══════════════════════════════════════════════
+   PAGE WRAPPER
+══════════════════════════════════════════════ */
+.page {
+  position:relative; z-index:1;
+  max-width:1440px; margin:0 auto;
+  padding:28px 24px 60px;
+  display:flex; flex-direction:column; gap:28px;
+}
+
+/* ══════════════════════════════════════════════
+   SECTION HEADER
+══════════════════════════════════════════════ */
+.sec-hdr {
+  display:flex; align-items:center; gap:14px; margin-bottom:16px;
+}
+.sec-hdr-line {
+  flex:1; height:1px;
+  background: linear-gradient(90deg, var(--ink-5) 0%, transparent 100%);
+}
+.sec-hdr-title {
+  font-family:var(--display); font-size:11px; font-weight:700;
+  letter-spacing:3px; text-transform:uppercase;
+  color:var(--slate-3); white-space:nowrap;
+  display:flex; align-items:center; gap:8px;
+}
+
+/* ══════════════════════════════════════════════
+   QR PATIENT CARDS
+══════════════════════════════════════════════ */
+.qr-grid {
+  display:grid; grid-template-columns:1fr 1fr; gap:20px;
+}
+
+.patient-qr-card {
+  background: var(--ink-2);
+  border:1px solid var(--ink-5);
+  border-radius:var(--r-xl);
+  overflow:hidden;
+  cursor:pointer;
+  transition: all var(--trans);
+  position:relative;
+}
+.patient-qr-card:hover {
+  border-color:var(--ink-6);
+  transform:translateY(-3px);
+  box-shadow: var(--sh);
+}
+.patient-qr-card.active {
+  border-color:rgba(0,180,216,.5);
+  box-shadow: 0 0 0 1px rgba(0,180,216,.2), var(--sh);
+}
+.patient-qr-card.active-emerg {
+  border-color:rgba(239,35,60,.5);
+  box-shadow: 0 0 0 1px rgba(239,35,60,.2), var(--sh);
+}
+
+/* Top accent line */
+.patient-qr-card::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:2px;
+  transition: background var(--trans);
+}
+.patient-qr-card.active::before        { background:linear-gradient(90deg,var(--cyan),var(--acid)); }
+.patient-qr-card.active-emerg::before  { background:linear-gradient(90deg,var(--red),var(--amber)); }
+.patient-qr-card:not(.active):not(.active-emerg)::before { background:var(--ink-5); }
+
+/* Card header */
+.pqc-hdr {
+  padding:18px 20px 14px;
+  display:flex; align-items:center; gap:14px;
+  border-bottom:1px solid var(--ink-4);
+}
+.pqc-avatar {
+  width:50px; height:50px; border-radius:50%; flex-shrink:0;
+  background:var(--ink-4);
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--display); font-size:18px; font-weight:800;
+  color:var(--white);
+  transition: all var(--trans);
+}
+.active .pqc-avatar       { background:var(--cyan); color:var(--ink); }
+.active-emerg .pqc-avatar { background:var(--red);  box-shadow:var(--red-glow); }
+
+.pqc-info { flex:1; min-width:0; }
+.pqc-id {
+  font-family:var(--mono); font-size:10px; font-weight:600;
+  letter-spacing:2px; color:var(--slate-3); margin-bottom:2px;
+}
+.pqc-name {
+  font-size:16px; font-weight:700; color:var(--white);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.pqc-sub { font-family:var(--mono); font-size:10px; color:var(--slate-4); margin-top:2px; }
+
+/* Card body */
+.pqc-body {
+  padding:16px 20px;
+  display:flex; gap:16px; align-items:flex-start;
+}
+.pqc-qr {
+  flex-shrink:0;
+  background:var(--white);
+  padding:8px; border-radius:var(--r);
+  border:2px solid var(--ink-4);
+  position:relative; overflow:hidden;
+}
+.pqc-qr canvas, .pqc-qr img { display:block; border-radius:4px; }
+
+/* Scan sweep animation */
+.pqc-qr::after {
+  content:'';
+  position:absolute; left:8px; right:8px; height:2px;
+  background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+  box-shadow:0 0 8px var(--cyan);
+  animation:sweep-line 3s ease-in-out infinite;
+  top:10%;
+}
+.active .pqc-qr { border-color:var(--cyan); }
+.active-emerg .pqc-qr { border-color:var(--red); }
+.active-emerg .pqc-qr::after { background:linear-gradient(90deg,transparent,var(--red),transparent); box-shadow:0 0 8px var(--red); }
+
+.pqc-meta { flex:1; display:flex; flex-direction:column; gap:8px; }
+.pqc-meta-row {
+  background:var(--ink-3);
+  border:1px solid var(--ink-4);
+  border-radius:var(--r);
+  padding:9px 12px;
+}
+.pqc-meta-lbl { font-family:var(--mono); font-size:8px; letter-spacing:2px; color:var(--slate-4); margin-bottom:3px; }
+.pqc-meta-val { font-size:12px; font-weight:600; color:var(--white); line-height:1.4; }
+.pqc-meta-val.url { font-family:var(--mono); font-size:10px; color:var(--cyan); word-break:break-all; }
+
+/* Card footer */
+.pqc-footer {
+  padding:12px 20px;
+  border-top:1px solid var(--ink-4);
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+}
+.pqc-scan-hint {
+  font-family:var(--mono); font-size:10px; color:var(--slate-4);
+  display:flex; align-items:center; gap:6px;
+}
+.pqc-select-btn {
+  font-family:var(--sans); font-size:11px; font-weight:700;
+  letter-spacing:.5px; text-transform:uppercase;
+  border:none; cursor:pointer; border-radius:var(--r);
+  padding:7px 16px; transition: all var(--trans);
+}
+.pqc-select-btn.default  { background:var(--ink-4); color:var(--slate-2); }
+.pqc-select-btn.default:hover { background:var(--cyan); color:var(--ink); }
+.pqc-select-btn.is-active   { background:var(--acid-dim); color:var(--acid); border:1px solid rgba(0,230,118,.3); }
+.pqc-select-btn.is-emergency { background:var(--red-dim); color:var(--red); border:1px solid rgba(239,35,60,.3); }
+
+/* ══════════════════════════════════════════════
+   TWO-COLUMN WORK AREA
+══════════════════════════════════════════════ */
+.work-area {
+  display:grid;
+  grid-template-columns: 400px 1fr;
+  gap:20px;
+  align-items:start;
+}
+
+/* ══════════════════════════════════════════════
+   PATIENT FORM
+══════════════════════════════════════════════ */
+.form-card {
+  background:var(--ink-2);
+  border:1px solid var(--ink-5);
+  border-radius:var(--r-xl);
+  overflow:hidden;
+  position:sticky; top:72px;
+  transition: border-color var(--trans);
+}
+.form-card.form-active   { border-color:rgba(0,180,216,.3); }
+.form-card.form-emergency { border-color:rgba(239,35,60,.3); }
+
+.form-hdr {
+  padding:16px 20px;
+  background:var(--ink-3);
+  border-bottom:1px solid var(--ink-4);
+  display:flex; align-items:center; justify-content:space-between;
+}
+.form-hdr-title {
+  font-family:var(--display); font-size:12px; font-weight:700;
+  letter-spacing:2px; text-transform:uppercase; color:var(--slate-2);
+  display:flex; align-items:center; gap:8px;
+}
+.form-patient-id {
+  font-family:var(--mono); font-size:11px; color:var(--cyan);
+  background:var(--ink-4); padding:3px 10px; border-radius:var(--r-sm);
+  border:1px solid var(--ink-5);
+}
+
+.form-body { padding:16px 20px; display:flex; flex-direction:column; gap:12px; max-height:calc(100vh - 200px); overflow-y:auto; }
+
+/* Form groups */
+.fg { display:flex; flex-direction:column; gap:4px; }
+.fg-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.fg label {
+  font-family:var(--mono); font-size:9px; font-weight:500;
+  letter-spacing:2px; text-transform:uppercase; color:var(--slate-4);
+}
+.fg input, .fg textarea, .fg select {
+  background:var(--ink-3);
+  border:1px solid var(--ink-5);
+  border-radius:var(--r);
+  color:var(--white);
+  font-family:var(--sans); font-size:13px;
+  padding:9px 12px;
+  outline:none;
+  transition: border-color var(--trans);
+  width:100%;
+  resize:vertical;
+}
+.fg input::placeholder, .fg textarea::placeholder { color:var(--slate-4); font-size:12px; }
+.fg input:focus, .fg textarea:focus { border-color:var(--cyan); box-shadow:0 0 0 3px rgba(0,180,216,.08); }
+
+.form-divider {
+  height:1px; background:var(--ink-4); margin:4px 0;
+  position:relative; display:flex; align-items:center; justify-content:center;
+}
+.form-divider span {
+  font-family:var(--mono); font-size:8px; letter-spacing:2px;
+  text-transform:uppercase; color:var(--slate-4);
+  background:var(--ink-2); padding:0 10px;
+  position:absolute;
+}
+
+.save-btn {
+  width:100%; padding:12px;
+  background: linear-gradient(135deg, var(--cyan), #0077b6);
+  color:var(--ink);
+  border:none; cursor:pointer;
+  border-radius:var(--r-lg);
+  font-family:var(--display); font-size:13px; font-weight:800;
+  letter-spacing:1.5px; text-transform:uppercase;
+  transition: all var(--trans);
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  margin-top:4px;
+}
+.save-btn:hover { transform:translateY(-1px); box-shadow:0 6px 24px rgba(0,180,216,.3); }
+.save-btn:active { transform:translateY(0); }
+.save-btn.saved { background:linear-gradient(135deg,var(--acid),#00a854); color:var(--ink); }
+
+/* ══════════════════════════════════════════════
+   PATIENT DETAIL PANEL (right side)
+══════════════════════════════════════════════ */
+.detail-panel {
+  display:flex; flex-direction:column; gap:18px;
+  animation: slide-up .3s ease;
+}
+
+/* Info card */
+.info-card {
+  background:var(--ink-2);
+  border:1px solid var(--ink-5);
+  border-radius:var(--r-xl);
+  overflow:hidden;
+}
+
+.ic-hdr {
+  padding:14px 20px;
+  background:var(--ink-3);
+  border-bottom:1px solid var(--ink-4);
+  display:flex; align-items:center; gap:10px;
+}
+.ic-hdr-title {
+  font-family:var(--display); font-size:10px; font-weight:700;
+  letter-spacing:2.5px; text-transform:uppercase; color:var(--slate-3);
+}
+
+.ic-body { padding:16px 20px; }
+
+/* Stats strip */
+.stat-strip {
+  display:grid; grid-template-columns:repeat(3,1fr);
+  gap:1px; background:var(--ink-4);
+  border:1px solid var(--ink-4); border-radius:var(--r-lg); overflow:hidden;
+  margin-bottom:16px;
+}
+.stat-cell {
+  background:var(--ink-2);
+  padding:14px 16px;
+  display:flex; flex-direction:column; gap:4px;
+}
+.sc-lbl { font-family:var(--mono); font-size:8px; letter-spacing:2px; text-transform:uppercase; color:var(--slate-4); }
+.sc-val { font-size:16px; font-weight:700; color:var(--white); }
+.sc-val.acid   { color:var(--acid); }
+.sc-val.red    { color:var(--red); }
+.sc-val.cyan   { color:var(--cyan); }
+.sc-val.amber  { color:var(--amber); }
+
+/* Note box */
+.note-box {
+  background:var(--amber-dim);
+  border:1px solid rgba(255,183,3,.2);
+  border-left:3px solid var(--amber);
+  border-radius:var(--r);
+  padding:12px 14px;
+  font-size:13px; color:var(--white); line-height:1.6;
+  display:flex; gap:10px;
+}
+.note-icon { font-size:16px; flex-shrink:0; margin-top:1px; }
+
+/* Schedule grids */
+.sched-grid {
+  display:grid; grid-template-columns:repeat(3,1fr);
+  gap:10px; margin-top:12px;
+}
+
+.sched-tile {
+  background:var(--ink-3);
+  border:1px solid var(--ink-4);
+  border-radius:var(--r-lg);
+  padding:14px;
+  position:relative; overflow:hidden;
+  transition: all var(--trans);
+}
+.sched-tile:hover { border-color:var(--ink-6); transform:translateY(-1px); }
+.sched-tile::before {
+  content:''; position:absolute; left:0; top:0; bottom:0; width:2px;
+}
+.st-taken::before   { background:var(--acid); }
+.st-pending::before { background:var(--amber); }
+.st-missed::before  { background:var(--red); }
+.st-none::before    { background:var(--ink-5); }
+
+.st-period {
+  font-family:var(--mono); font-size:8px; letter-spacing:2px;
+  text-transform:uppercase; color:var(--slate-4); margin-bottom:6px;
+  display:flex; align-items:center; gap:5px;
+}
+.st-name { font-size:13px; font-weight:700; color:var(--white); line-height:1.3; margin-bottom:4px; }
+.st-dose { font-size:11px; color:var(--slate-3); }
+.st-time { font-family:var(--mono); font-size:12px; color:var(--cyan); margin-top:6px; }
+
+.st-chip {
+  position:absolute; top:10px; right:10px;
+  font-family:var(--mono); font-size:8px; letter-spacing:1px; text-transform:uppercase;
+  padding:2px 7px; border-radius:var(--r-sm);
+}
+.st-chip.taken   { background:var(--acid-dim); color:var(--acid); }
+.st-chip.pending { background:var(--amber-dim); color:var(--amber); }
+.st-chip.missed  { background:var(--red-dim); color:var(--red); animation:blink .9s ease infinite; }
+.st-chip.none    { background:rgba(71,85,105,.2); color:var(--slate-4); }
+
+/* ══════════════════════════════════════════════
+   ESP32 LIVE SECTION
+══════════════════════════════════════════════ */
+.esp-section {
+  background:var(--ink-2);
+  border:1px solid var(--ink-5);
+  border-radius:var(--r-xl);
+  overflow:hidden;
+}
+
+.esp-top-bar {
+  background:var(--ink);
+  padding:14px 22px;
+  display:flex; align-items:center; justify-content:space-between; gap:14px;
+  border-bottom:1px solid rgba(0,180,216,.1);
+}
+.esp-top-left { display:flex; align-items:center; gap:14px; }
+.esp-top-title {
+  font-family:var(--display); font-size:11px; font-weight:700;
+  letter-spacing:2.5px; text-transform:uppercase; color:var(--slate-3);
+  display:flex; align-items:center; gap:8px;
+}
+.esp-url-chip {
+  font-family:var(--mono); font-size:11px; color:var(--cyan);
+  background:var(--ink-3); padding:4px 10px;
+  border-radius:var(--r-sm); border:1px solid var(--ink-5);
+}
+.esp-poll-lbl {
+  font-family:var(--mono); font-size:10px; color:var(--slate-4);
+}
+
+/* 5-column vitals bar */
+.vitals-bar {
+  display:grid; grid-template-columns:repeat(5,1fr);
+  border-bottom:1px solid var(--ink-4);
+}
+.vb {
+  padding:22px 18px;
+  border-right:1px solid var(--ink-4);
+  display:flex; flex-direction:column; gap:8px;
+  position:relative; overflow:hidden;
+  transition: background var(--trans);
+}
+.vb:last-child { border-right:none; }
+.vb:hover { background:var(--ink-3); }
+
+/* Left accent stripe */
+.vb::after {
+  content:''; position:absolute; left:0; top:0; bottom:0; width:2px;
+  transition: background var(--trans);
+}
+.vb.s-ok::after     { background:var(--acid); }
+.vb.s-warn::after   { background:var(--amber); }
+.vb.s-danger::after { background:var(--red); }
+.vb.s-idle::after   { background:var(--ink-5); }
+
+.vb-lbl { font-family:var(--mono); font-size:8px; letter-spacing:2.5px; text-transform:uppercase; color:var(--slate-4); }
+.vb-icon { font-size:20px; }
+.vb-val {
+  font-family:var(--mono); font-size:34px; font-weight:700; line-height:1;
+  color:var(--white); transition: color var(--trans);
+}
+.vb-val.ok     { color:var(--acid); }
+.vb-val.warn   { color:var(--amber); }
+.vb-val.danger { color:var(--red); }
+.vb-unit { font-family:var(--mono); font-size:11px; color:var(--slate-4); }
+.vb-status {
+  font-size:11px; color:var(--slate-3);
+  display:flex; align-items:center; gap:5px;
+}
+.vb-status-dot {
+  width:6px; height:6px; border-radius:50%; flex-shrink:0;
+  background:var(--ink-5);
+  transition: background var(--trans);
+}
+.vb-status-dot.ok     { background:var(--acid); box-shadow:0 0 5px var(--acid); }
+.vb-status-dot.warn   { background:var(--amber); animation:blink 1s ease infinite; }
+.vb-status-dot.danger { background:var(--red); animation:blink .7s ease infinite; }
+
+/* Sparkline */
+.spark-wrap { height:32px; margin-top:2px; }
+.spark-wrap canvas { width:100%; height:32px; }
+
+/* Bottom status + raw JSON */
+.esp-bottom {
+  display:grid; grid-template-columns:1fr 300px;
+}
+
+.esp-status-cells {
+  padding:16px 20px;
+  display:grid; grid-template-columns:repeat(4,1fr);
+  gap:12px; border-right:1px solid var(--ink-4);
+}
+.esc {
+  background:var(--ink-3);
+  border:1px solid var(--ink-4);
+  border-radius:var(--r);
+  padding:12px;
+  display:flex; flex-direction:column; gap:5px;
+  transition: border-color var(--trans);
+}
+.esc:hover { border-color:var(--ink-5); }
+.esc-lbl { font-family:var(--mono); font-size:8px; letter-spacing:2px; text-transform:uppercase; color:var(--slate-4); }
+.esc-val {
+  font-family:var(--mono); font-size:18px; font-weight:700; color:var(--white);
+  transition: color var(--trans);
+}
+.esc-val.ok     { color:var(--acid); }
+.esc-val.warn   { color:var(--amber); }
+.esc-val.danger { color:var(--red); animation:blink .8s ease infinite; }
+.esc-val.idle   { color:var(--slate-4); }
+
+.esp-raw { padding:16px 18px; }
+.esp-raw-hdr {
+  font-family:var(--mono); font-size:8px; letter-spacing:2px;
+  text-transform:uppercase; color:var(--slate-4); margin-bottom:8px;
+  display:flex; align-items:center; justify-content:space-between;
+}
+.esp-raw-pre {
+  background:var(--ink);
+  border:1px solid var(--ink-4);
+  border-radius:var(--r);
+  color:var(--cyan);
+  font-family:var(--mono); font-size:10px;
+  padding:10px 12px; line-height:1.8;
+  min-height:110px; max-height:160px;
+  overflow:auto; white-space:pre;
+}
+
+/* ══════════════════════════════════════════════
+   EMPTY STATE
+══════════════════════════════════════════════ */
+.empty-state {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:12px; padding:60px 20px;
+  color:var(--slate-4);
+  text-align:center;
+}
+.empty-icon { font-size:40px; opacity:.4; }
+.empty-msg { font-family:var(--mono); font-size:12px; letter-spacing:1px; line-height:1.6; }
+
+/* ══════════════════════════════════════════════
+   TOAST
+══════════════════════════════════════════════ */
+.toast {
+  position:fixed; bottom:28px; left:50%;
+  transform:translateX(-50%) translateY(80px);
+  background:var(--ink-3);
+  border:1px solid var(--ink-5);
+  border-radius:var(--r-xl);
+  padding:12px 22px;
+  font-size:13px; font-weight:600;
+  box-shadow:var(--sh-lg);
+  display:flex; align-items:center; gap:10px;
+  opacity:0; pointer-events:none;
+  transition: all .4s cubic-bezier(.34,1.56,.64,1);
+  z-index:9999; white-space:nowrap; color:var(--white);
+}
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); pointer-events:auto; }
+.toast.t-ok    { border-color:rgba(0,230,118,.4); }
+.toast.t-error { border-color:rgba(239,35,60,.4); }
+.toast.t-warn  { border-color:rgba(255,183,3,.4); }
+.toast.t-info  { border-color:rgba(0,180,216,.4); }
+
+/* ══════════════════════════════════════════════
+   SAVE CONFIRM BADGE
+══════════════════════════════════════════════ */
+.save-confirm {
+  display:inline-flex; align-items:center; gap:6px;
+  background:var(--acid-dim); color:var(--acid);
+  border:1px solid rgba(0,230,118,.3);
+  border-radius:var(--r); padding:4px 10px;
+  font-family:var(--mono); font-size:10px; font-weight:500;
+  letter-spacing:1px; opacity:0;
+  transition: opacity .3s;
+}
+.save-confirm.show { opacity:1; }
+
+/* ══════════════════════════════════════════════
+   NEXT DOSE BANNER
+══════════════════════════════════════════════ */
+.next-banner {
+  background:var(--ink-2);
+  border:1px solid rgba(0,180,216,.2);
+  border-left:3px solid var(--cyan);
+  border-radius:var(--r-xl);
+  padding:16px 22px;
+  display:flex; align-items:center; gap:18px;
+  box-shadow: 0 0 24px rgba(0,180,216,.06);
+}
+.nb-icon { font-size:28px; flex-shrink:0; }
+.nb-body { flex:1; }
+.nb-lbl { font-family:var(--mono); font-size:8px; letter-spacing:2px; text-transform:uppercase; color:var(--cyan); margin-bottom:4px; }
+.nb-med { font-family:var(--display); font-size:18px; font-weight:800; color:var(--white); }
+.nb-sub { font-size:12px; color:var(--slate-3); margin-top:2px; }
+.nb-cd  { font-family:var(--mono); font-size:30px; font-weight:700; color:var(--cyan); line-height:1; }
+.nb-cd-lbl { font-family:var(--mono); font-size:9px; color:var(--slate-4); }
+
+/* ══════════════════════════════════════════════
+   RESPONSIVE
+══════════════════════════════════════════════ */
+@media (max-width:1200px) {
+  .work-area { grid-template-columns:360px 1fr; }
+  .vitals-bar { grid-template-columns:repeat(3,1fr); }
+  .esp-status-cells { grid-template-columns:repeat(2,1fr); }
+  .esp-bottom { grid-template-columns:1fr; }
+  .esp-raw { border-top:1px solid var(--ink-4); }
+}
+@media (max-width:960px) {
+  .qr-grid  { grid-template-columns:1fr; }
+  .work-area { grid-template-columns:1fr; }
+  .form-card { position:static; }
+  .sched-grid { grid-template-columns:1fr 1fr; }
+  .vitals-bar { grid-template-columns:repeat(2,1fr); }
+  .stat-strip { grid-template-columns:1fr 1fr; }
+}
+@media (max-width:640px) {
+  html { font-size:13px; }
+  .page { padding:16px 14px 40px; gap:20px; }
+  .hdr { padding:0 16px; gap:12px; }
+  .hdr-title h1 { font-size:15px; }
+  .hdr-active { display:none; }
+  .sched-grid { grid-template-columns:1fr; }
+  .vitals-bar { grid-template-columns:1fr 1fr; }
+  .esp-status-cells { grid-template-columns:1fr 1fr; }
+  .vb-val { font-size:26px; }
+  .next-banner { flex-wrap:wrap; }
+  .stat-strip { grid-template-columns:1fr 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════
+     HEADER
+══════════════════════════════════════════ -->
+<header class="hdr">
+  <div class="hdr-cross">➕</div>
+  <div class="hdr-title">
+    <h1>MediCare REV</h1>
+    <div class="sub">Smart Healthcare · ESP32 · v2.0</div>
+  </div>
+  <div class="hdr-sep"></div>
+
+  <div class="hdr-active">
+    <div class="label">Active Patient</div>
+    <div id="hdrChip">
+      <span class="hdr-no-active">— No patient selected —</span>
+    </div>
+  </div>
+
+  <div class="hdr-right">
+    <div class="clock" id="clock">--:--:--</div>
+    <div class="esp-status off" id="espStatus">
+      <div class="s-dot"></div>
+      <span id="espStatusLabel">Connecting</span>
+    </div>
+  </div>
+</header>
+
+<!-- ══════════════════════════════════════════
+     PAGE
+══════════════════════════════════════════ -->
+<div class="page">
+
+  <!-- ── NEXT DOSE BANNER ── -->
+  <div id="nextBanner" style="display:none" class="next-banner">
+    <div class="nb-icon">⏱️</div>
+    <div class="nb-body">
+      <div class="nb-lbl">EDF · Next Scheduled Dose</div>
+      <div class="nb-med" id="nbMed">—</div>
+      <div class="nb-sub" id="nbSub">—</div>
+    </div>
+    <div>
+      <div class="nb-cd" id="nbCd">—</div>
+      <div class="nb-cd-lbl">until dose</div>
+    </div>
+  </div>
+
+  <!-- ── QR PATIENT SELECTION ── -->
+  <div>
+    <div class="sec-hdr">
+      <div class="sec-hdr-line"></div>
+      <div class="sec-hdr-title">📷 Patient QR Codes · Scan to Open Dashboard</div>
+      <div class="sec-hdr-line" style="background:linear-gradient(90deg,transparent,var(--ink-5))"></div>
+    </div>
+    <div class="qr-grid" id="qrGrid"><!-- JS renders --></div>
+  </div>
+
+  <!-- ── WORK AREA: FORM + DETAIL ── -->
+  <div>
+    <div class="sec-hdr">
+      <div class="sec-hdr-line"></div>
+      <div class="sec-hdr-title">👤 Patient Data · Form &amp; Records</div>
+      <div class="sec-hdr-line" style="background:linear-gradient(90deg,transparent,var(--ink-5))"></div>
+    </div>
+    <div class="work-area">
+
+      <!-- LEFT: FORM -->
+      <div class="form-card" id="formCard">
+        <div class="form-hdr">
+          <div class="form-hdr-title">📋 Patient Form</div>
+          <span class="form-patient-id" id="formPidLabel">ID —</span>
+        </div>
+        <div class="form-body" id="formBody">
+          <div class="empty-state">
+            <div class="empty-icon">📋</div>
+            <div class="empty-msg">Select a patient above<br>to load or create their record</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: PATIENT DETAIL -->
+      <div id="detailPanel">
+        <div class="info-card">
+          <div class="ic-hdr"><div class="ic-hdr-title" style="font-size:12px">📂 Patient Record</div></div>
+          <div class="empty-state">
+            <div class="empty-icon">🏥</div>
+            <div class="empty-msg">No patient selected.<br>Scan a QR code or click a patient card.</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── ESP32 LIVE DATA ── -->
+  <div>
+    <div class="sec-hdr">
+      <div class="sec-hdr-line"></div>
+      <div class="sec-hdr-title">📡 ESP32 Live Data · Real-Time Monitor</div>
+      <div class="sec-hdr-line" style="background:linear-gradient(90deg,transparent,var(--ink-5))"></div>
+    </div>
+
+    <div class="esp-section">
+      <!-- Top bar -->
+      <div class="esp-top-bar">
+        <div class="esp-top-left">
+          <div class="esp-top-title">Live Feed</div>
+          <div class="esp-url-chip">http://10.222.139.174</div>
+          <div class="tag tag-cyan" id="pollTag">● Polling 2s</div>
+        </div>
+        <div class="esp-poll-lbl" id="lastPollLabel">—</div>
+      </div>
+
+      <!-- Vitals bar -->
+      <div class="vitals-bar">
+        <!-- Heart Rate -->
+        <div class="vb s-idle" id="vb-hr">
+          <div class="vb-lbl">Heart Rate</div>
+          <div class="vb-icon">❤️</div>
+          <div><span class="vb-val" id="v-hr">—</span><span class="vb-unit"> bpm</span></div>
+          <div class="spark-wrap"><canvas id="hrCanvas"></canvas></div>
+          <div class="vb-status"><div class="vb-status-dot" id="dot-hr"></div><span id="sub-hr">Awaiting data…</span></div>
+        </div>
+        <!-- Box -->
+        <div class="vb s-idle" id="vb-box">
+          <div class="vb-lbl">Box Status</div>
+          <div class="vb-icon">📦</div>
+          <div class="vb-val" id="v-box" style="font-size:22px">—</div>
+          <div class="vb-unit" style="margin-top:6px">Medicine Box</div>
+          <div class="vb-status"><div class="vb-status-dot" id="dot-box"></div><span id="sub-box">Awaiting…</span></div>
+        </div>
+        <!-- Medicine -->
+        <div class="vb s-idle" id="vb-med">
+          <div class="vb-lbl">Medicine</div>
+          <div class="vb-icon">💊</div>
+          <div class="vb-val" id="v-med" style="font-size:22px">—</div>
+          <div class="vb-unit" style="margin-top:6px">Dose Status</div>
+          <div class="vb-status"><div class="vb-status-dot" id="dot-med"></div><span id="sub-med">Awaiting…</span></div>
+        </div>
+        <!-- Alert -->
+        <div class="vb s-idle" id="vb-alert">
+          <div class="vb-lbl">Alert</div>
+          <div class="vb-icon">🚨</div>
+          <div class="vb-val" id="v-alert" style="font-size:22px">—</div>
+          <div class="vb-unit" style="margin-top:6px">System Alert</div>
+          <div class="vb-status"><div class="vb-status-dot" id="dot-alert"></div><span id="sub-alert">Awaiting…</span></div>
+        </div>
+        <!-- Next Dose -->
+        <div class="vb s-idle" id="vb-next">
+          <div class="vb-lbl">Next Dose</div>
+          <div class="vb-icon">⏰</div>
+          <div class="vb-val" id="v-next" style="font-size:20px">—</div>
+          <div class="vb-unit" style="margin-top:6px">Scheduled</div>
+          <div class="vb-status"><div class="vb-status-dot" id="dot-next"></div><span id="sub-next">Awaiting…</span></div>
+        </div>
+      </div>
+
+      <!-- Bottom: Status cells + Raw JSON -->
+      <div class="esp-bottom">
+        <div class="esp-status-cells">
+          <div class="esc"><div class="esc-lbl">📦 Box</div><div class="esc-val idle" id="es-box">—</div></div>
+          <div class="esc"><div class="esc-lbl">💊 Medicine</div><div class="esc-val idle" id="es-med">—</div></div>
+          <div class="esc"><div class="esc-lbl">🚨 Alert</div><div class="esc-val idle" id="es-alert">—</div></div>
+          <div class="esc"><div class="esc-lbl">⏰ Next Dose</div><div class="esc-val idle" id="es-next">—</div></div>
+        </div>
+        <div class="esp-raw">
+          <div class="esp-raw-hdr">
+            <span>JSON Response</span>
+            <span id="rawTimestamp" style="color:var(--slate-4)">—</span>
+          </div>
+          <pre class="esp-raw-pre" id="rawPre">// Waiting for ESP32…
+// URL: http://10.222.139.174
+// Poll interval: 2 seconds</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /page -->
+
+<!-- TOAST -->
+<div class="toast" id="toast">
+  <span id="toastIcon">✅</span> <span id="toastMsg">—</span>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     JAVASCRIPT
+═══════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+/* ════════════════════════════════════════
+   CONFIG
+════════════════════════════════════════ */
+const ESP_URL     = 'http://10.222.139.174';
+const BASE_URL    = window.location.origin + window.location.pathname; // dynamic — works on any host/port
+const POLL_MS     = 2000;
+const PATIENT_IDS = ['ID001', 'ID002'];
+
+/* Default scaffold loaded when no localStorage data exists */
+const DEFAULTS = {
+  ID001: {
+    name:'Arjun Sharma', age:'67',
+    disease:'Type-2 Diabetes · Hypertension',
+    doctor:'Dr. Ramesh Kumar',
+    notes:'Take medicine after food. Avoid sugar. Monitor BP daily.',
+    medMorning:'Metformin 500mg', medAfternoon:'Amlodipine 5mg', medNight:'Atorvastatin 10mg',
+    ivMorning:'Saline IV 100ml/hr', ivAfternoon:'Insulin IV 5 units', ivNight:'None',
+    alertState:'normal',
+  },
+  ID002: {
+    name:'Priya Nair', age:'45',
+    disease:'Epilepsy',
+    doctor:'Dr. Anitha Menon',
+    notes:'Strict medication timing required. Do not skip doses. Seizure risk.',
+    medMorning:'Aspirin 75mg', medAfternoon:'Losartan 50mg', medNight:'Levetiracetam 500mg',
+    ivMorning:'Glucose IV 50ml', ivAfternoon:'None', ivNight:'Anti-seizure IV 2ml',
+    alertState:'emergency',
+  },
+};
+
+const INITIALS = { ID001:'AS', ID002:'PN' };
+
+/* ════════════════════════════════════════
+   STATE
+════════════════════════════════════════ */
+let activeId   = null;
+let hrHistory  = [];
+let pollTimer  = null;
+let espOnline  = false;
+
+/* ════════════════════════════════════════
+   LOCAL STORAGE HELPERS
+════════════════════════════════════════ */
+function loadPatient(id) {
+  try {
+    const raw = localStorage.getItem(`patient_${id}`);
+    if (raw) return { ...DEFAULTS[id], ...JSON.parse(raw) };
+  } catch(e) {}
+  return { ...DEFAULTS[id] };
+}
+
+function savePatient(id, data) {
+  try {
+    localStorage.setItem(`patient_${id}`, JSON.stringify(data));
+    return true;
+  } catch(e) {
+    return false;
+  }
+}
+
+function readFormData(id) {
+  const g = s => (document.getElementById(s) || {}).value || '';
+  return {
+    name:         g(`f-name-${id}`),
+    age:          g(`f-age-${id}`),
+    disease:      g(`f-disease-${id}`),
+    doctor:       g(`f-doctor-${id}`),
+    notes:        g(`f-notes-${id}`),
+    medMorning:   g(`f-medM-${id}`),
+    medAfternoon: g(`f-medA-${id}`),
+    medNight:     g(`f-medN-${id}`),
+    ivMorning:    g(`f-ivM-${id}`),
+    ivAfternoon:  g(`f-ivA-${id}`),
+    ivNight:      g(`f-ivN-${id}`),
+    alertState:   loadPatient(id).alertState || 'normal',
+  };
+}
+
+/* ════════════════════════════════════════
+   UTILITIES
+════════════════════════════════════════ */
+function nowHMS() { return new Date().toTimeString().slice(0,8); }
+function nowHM()  { return new Date().toTimeString().slice(0,5); }
+
+function minutesUntil(hhmm) {
+  if (!hhmm || hhmm === '—' || hhmm === 'None' || hhmm === 'none') return Infinity;
+  const parts = hhmm.match(/(\d{1,2}):(\d{2})/);
+  if (!parts) return Infinity;
+  const [,h,m] = parts;
+  const now = new Date();
+  const t = new Date(); t.setHours(+h, +m, 0, 0);
+  if (t <= now) t.setDate(t.getDate()+1);
+  return Math.round((t - now)/60000);
+}
+
+function fmtCd(mins) {
+  if (!isFinite(mins)||mins<=0) return 'NOW';
+  if (mins<60) return `${mins}m`;
+  return `${Math.floor(mins/60)}h ${mins%60}m`;
+}
+
+function hrClass(hr) {
+  return hr>100||hr<55 ? 'danger' : hr>90||hr<60 ? 'warn' : 'ok';
+}
+
+function initials(name) {
+  if (!name) return '?';
+  return name.trim().split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase();
+}
+
+/* ════════════════════════════════════════
+   CLOCK
+════════════════════════════════════════ */
+setInterval(() => { document.getElementById('clock').textContent = nowHMS(); }, 1000);
+document.getElementById('clock').textContent = nowHMS();
+
+/* ════════════════════════════════════════
+   TOAST
+════════════════════════════════════════ */
+function toast(msg, type='ok') {
+  const icons = { ok:'✅', error:'❌', warn:'⚠️', info:'💡' };
+  const el = document.getElementById('toast');
+  document.getElementById('toastIcon').textContent = icons[type]||'✅';
+  document.getElementById('toastMsg').textContent  = msg;
+  el.className = `toast show t-${type}`;
+  clearTimeout(el._t);
+  el._t = setTimeout(()=>el.classList.remove('show'), 3400);
+}
+
+/* ════════════════════════════════════════
+   QR CARD RENDER
+════════════════════════════════════════ */
+function buildQRCards() {
+  const grid = document.getElementById('qrGrid');
+  grid.innerHTML = '';
+
+  PATIENT_IDS.forEach(id => {
+    const p = loadPatient(id);
+    const url = `${BASE_URL}?patient=${id}`;
+    const isActive = id === activeId;
+    const isEmerg  = p.alertState === 'emergency';
+    const cardCls  = isActive ? (isEmerg ? 'active-emerg' : 'active') : '';
+
+    const card = document.createElement('div');
+    card.className = `patient-qr-card ${cardCls}`;
+    card.id = `qrc-${id}`;
+    card.onclick = () => selectPatient(id);
+
+    card.innerHTML = `
+      <div class="pqc-hdr">
+        <div class="pqc-avatar" id="av-${id}">${initials(p.name)||INITIALS[id]}</div>
+        <div class="pqc-info">
+          <div class="pqc-id">${id}</div>
+          <div class="pqc-name" id="qrcName-${id}">${p.name||'— No name —'}</div>
+          <div class="pqc-sub" id="qrcSub-${id}">Age ${p.age||'—'} · ${p.doctor||'—'}</div>
+        </div>
+        <span class="tag ${isEmerg?'tag-red':'tag-acid'}" id="qrcTag-${id}">
+          ${isEmerg?'🚨 Emergency':'✅ Normal'}
+        </span>
+      </div>
+      <div class="pqc-body">
+        <div class="pqc-qr" id="qr-${id}"></div>
+        <div class="pqc-meta">
+          <div class="pqc-meta-row">
+            <div class="pqc-meta-lbl">Diagnosis</div>
+            <div class="pqc-meta-val" id="qrcDis-${id}">${p.disease||'—'}</div>
+          </div>
+          <div class="pqc-meta-row">
+            <div class="pqc-meta-lbl">QR URL</div>
+            <div class="pqc-meta-val url">${url}</div>
+          </div>
+          <div class="pqc-meta-row">
+            <div class="pqc-meta-lbl">Patient ID</div>
+            <div class="pqc-meta-val url">?patient=${id}</div>
+          </div>
+        </div>
+      </div>
+      <div class="pqc-footer">
+        <div class="pqc-scan-hint">📱 Scan → opens dashboard → auto-selects patient</div>
+        <button class="pqc-select-btn ${isActive?(isEmerg?'is-emergency':'is-active'):'default'}"
+                onclick="event.stopPropagation();selectPatient('${id}')">
+          ${isActive?`✓ Viewing ${id}`:`→ Select ${id}`}
+        </button>
+      </div>
+    `;
+
+    grid.appendChild(card);
+
+    /* Generate QR code */
+    try {
+      new QRCode(document.getElementById(`qr-${id}`), {
+        text: url,
+        width:  130, height: 130,
+        colorDark:  '#060d1a',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M,
+      });
+    } catch(e) {
+      document.getElementById(`qr-${id}`).innerHTML =
+        `<div style="width:130px;height:130px;display:flex;align-items:center;justify-content:center;
+         font-family:var(--mono);font-size:9px;color:var(--slate-4);text-align:center;padding:10px">
+         QR loading…<br>Check CDN</div>`;
+    }
+  });
+}
+
+function refreshQRCard(id) {
+  const p = loadPatient(id);
+  const isActive = id === activeId;
+  const isEmerg  = p.alertState === 'emergency';
+  const card = document.getElementById(`qrc-${id}`);
+  if (!card) return;
+  card.className = `patient-qr-card ${isActive?(isEmerg?'active-emerg':'active'):''}`;
+  const nm = document.getElementById(`qrcName-${id}`);
+  const sb = document.getElementById(`qrcSub-${id}`);
+  const tg = document.getElementById(`qrcTag-${id}`);
+  const ds = document.getElementById(`qrcDis-${id}`);
+  const av = document.getElementById(`av-${id}`);
+  if (nm) nm.textContent = p.name||'—';
+  if (sb) sb.textContent = `Age ${p.age||'—'} · ${p.doctor||'—'}`;
+  if (tg) { tg.className=`tag ${isEmerg?'tag-red':'tag-acid'}`; tg.textContent=isEmerg?'🚨 Emergency':'✅ Normal'; }
+  if (ds) ds.textContent = p.disease||'—';
+  if (av) av.textContent = initials(p.name)||INITIALS[id];
+}
+
+/* ════════════════════════════════════════
+   PATIENT FORM RENDER
+════════════════════════════════════════ */
+function renderForm(id) {
+  const p = loadPatient(id);
+  const isEmerg = p.alertState === 'emergency';
+
+  document.getElementById('formPidLabel').textContent = id;
+  document.getElementById('formCard').className =
+    `form-card ${isEmerg?'form-emergency':'form-active'}`;
+
+  document.getElementById('formBody').innerHTML = `
+    <div class="fg-row">
+      <div class="fg">
+        <label>Patient Name</label>
+        <input id="f-name-${id}" type="text" placeholder="Full name" value="${esc(p.name)}">
+      </div>
+      <div class="fg">
+        <label>Age</label>
+        <input id="f-age-${id}" type="number" min="0" max="120" placeholder="Age" value="${esc(p.age)}">
+      </div>
+    </div>
+
+    <div class="fg">
+      <label>Disease / Diagnosis</label>
+      <input id="f-disease-${id}" type="text" placeholder="Primary diagnosis" value="${esc(p.disease)}">
+    </div>
+
+    <div class="fg">
+      <label>Doctor Name</label>
+      <input id="f-doctor-${id}" type="text" placeholder="Attending physician" value="${esc(p.doctor)}">
+    </div>
+
+    <div class="fg">
+      <label>Doctor Notes &amp; Instructions</label>
+      <textarea id="f-notes-${id}" rows="3" placeholder="Clinical notes, dietary restrictions, alerts…">${esc(p.notes)}</textarea>
+    </div>
+
+    <div class="form-divider"><span>💊 Oral Medicine</span></div>
+
+    <div class="fg">
+      <label>🌅 Morning Medicine</label>
+      <input id="f-medM-${id}" type="text" placeholder="e.g. Metformin 500mg" value="${esc(p.medMorning)}">
+    </div>
+    <div class="fg">
+      <label>☀️ Afternoon Medicine</label>
+      <input id="f-medA-${id}" type="text" placeholder="e.g. Amlodipine 5mg" value="${esc(p.medAfternoon)}">
+    </div>
+    <div class="fg">
+      <label>🌙 Night Medicine</label>
+      <input id="f-medN-${id}" type="text" placeholder="e.g. Atorvastatin 10mg" value="${esc(p.medNight)}">
+    </div>
+
+    <div class="form-divider"><span>🩺 IV Dosage</span></div>
+
+    <div class="fg">
+      <label>🌅 IV Morning</label>
+      <input id="f-ivM-${id}" type="text" placeholder="e.g. Saline IV 100ml/hr" value="${esc(p.ivMorning)}">
+    </div>
+    <div class="fg">
+      <label>☀️ IV Afternoon</label>
+      <input id="f-ivA-${id}" type="text" placeholder="e.g. Insulin IV 5 units" value="${esc(p.ivAfternoon)}">
+    </div>
+    <div class="fg">
+      <label>🌙 IV Night</label>
+      <input id="f-ivN-${id}" type="text" placeholder="e.g. None" value="${esc(p.ivNight)}">
+    </div>
+
+    <button class="save-btn" id="saveBtn-${id}" onclick="handleSave('${id}')">
+      💾 Save Patient Data
+    </button>
+    <div class="save-confirm" id="saveConfirm-${id}">✓ Saved to device</div>
+  `;
+}
+
+function esc(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ════════════════════════════════════════
+   SAVE HANDLER
+════════════════════════════════════════ */
+function handleSave(id) {
+  const data = readFormData(id);
+  const ok   = savePatient(id, data);
+  if (ok) {
+    /* Visual feedback */
+    const btn = document.getElementById(`saveBtn-${id}`);
+    const cfm = document.getElementById(`saveConfirm-${id}`);
+    if (btn) { btn.classList.add('saved'); btn.textContent='✓ Saved!'; }
+    if (cfm) { cfm.classList.add('show'); }
+    setTimeout(()=>{
+      if (btn) { btn.classList.remove('saved'); btn.innerHTML='💾 Save Patient Data'; }
+      if (cfm) cfm.classList.remove('show');
+    }, 2500);
+
+    /* Re-render detail panel and QR card */
+    renderDetail(id);
+    refreshQRCard(id);
+    updateNextBanner(id);
+    toast(`${data.name||id} · Data saved ✓`, 'ok');
+  } else {
+    toast('Save failed — check browser permissions', 'error');
+  }
+}
+
+/* ════════════════════════════════════════
+   DETAIL PANEL RENDER
+════════════════════════════════════════ */
+function renderDetail(id) {
+  const p = loadPatient(id);
+  const panel = document.getElementById('detailPanel');
+  const isEmerg = p.alertState === 'emergency';
+
+  /* Build schedule tiles */
+  function tile(period, icon, name, dose, time, ivMode) {
+    const isEmpty = !name || name.toLowerCase() === 'none' || name === '—';
+    const status  = isEmpty ? 'none' : 'pending'; /* Default to pending; ESP32 updates this */
+    return `
+      <div class="sched-tile st-${status}">
+        <div class="st-chip ${status}">${status.toUpperCase()}</div>
+        <div class="st-period">${icon} ${period}</div>
+        <div class="st-name">${isEmpty?'<span style="color:var(--slate-4)">None prescribed</span>':esc(name)}</div>
+        ${!isEmpty?`<div class="st-dose">${ivMode?'💉':'💊'} ${esc(dose||'As prescribed')}</div>`:''}
+        ${!isEmpty&&time?`<div class="st-time">${esc(time)}</div>`:''}
+      </div>`;
+  }
+
+  panel.innerHTML = `
+    <div class="detail-panel">
+
+      <!-- Identity card -->
+      <div class="info-card">
+        <div class="ic-hdr">
+          <div class="ic-hdr-title">👤 Patient Identity — ${id}</div>
+          <span class="tag ${isEmerg?'tag-red':'tag-acid'}">${isEmerg?'🚨 Emergency':'✅ Normal'}</span>
+        </div>
+        <div class="ic-body">
+          <div class="stat-strip">
+            <div class="stat-cell">
+              <div class="sc-lbl">Patient ID</div>
+              <div class="sc-val cyan" style="font-family:var(--mono);font-size:14px;letter-spacing:1px">${id}</div>
+            </div>
+            <div class="stat-cell">
+              <div class="sc-lbl">Age</div>
+              <div class="sc-val">${p.age||'—'}</div>
+            </div>
+            <div class="stat-cell">
+              <div class="sc-lbl">Status</div>
+              <div class="sc-val ${isEmerg?'red':'acid'}">${isEmerg?'⚡ Emerg':'✅ OK'}</div>
+            </div>
+          </div>
+
+          <div style="margin-bottom:12px">
+            <div class="label" style="margin-bottom:6px">Full Name</div>
+            <div style="font-family:var(--display);font-size:22px;font-weight:800;color:var(--white)">${esc(p.name)||'— Not set —'}</div>
+          </div>
+
+          <div class="fg-row" style="margin-bottom:12px">
+            <div>
+              <div class="label" style="margin-bottom:4px">Diagnosis</div>
+              <div style="font-size:13px;font-weight:700;color:${isEmerg?'var(--red)':'var(--amber)'}">${esc(p.disease)||'—'}</div>
+            </div>
+            <div>
+              <div class="label" style="margin-bottom:4px">Doctor</div>
+              <div style="font-size:13px;font-weight:600;color:var(--white)">${esc(p.doctor)||'—'}</div>
+            </div>
+          </div>
+
+          ${p.notes?`
+          <div class="note-box">
+            <div class="note-icon">📋</div>
+            <div>${esc(p.notes)}</div>
+          </div>`:''}
+        </div>
+      </div>
+
+      <!-- Medicine Schedule -->
+      <div class="info-card">
+        <div class="ic-hdr">
+          <div class="ic-hdr-title">💊 Oral Medicine Schedule</div>
+          <span class="tag tag-cyan">Daily Rx</span>
+        </div>
+        <div class="ic-body">
+          <div class="sched-grid">
+            ${tile('Morning',   '🌅', p.medMorning,   '1 dose', '08:00')}
+            ${tile('Afternoon', '☀️', p.medAfternoon, '1 dose', '13:00')}
+            ${tile('Night',     '🌙', p.medNight,     '1 dose', '21:00')}
+          </div>
+        </div>
+      </div>
+
+      <!-- IV Schedule -->
+      <div class="info-card">
+        <div class="ic-hdr">
+          <div class="ic-hdr-title">🩺 IV Dosage Schedule</div>
+          <span class="tag tag-amber">Intravenous</span>
+        </div>
+        <div class="ic-body">
+          <div class="sched-grid">
+            ${tile('Morning',   '🌅', p.ivMorning,   '', '08:30', true)}
+            ${tile('Afternoon', '☀️', p.ivAfternoon, '', '13:30', true)}
+            ${tile('Night',     '🌙', p.ivNight,     '', '21:00', true)}
+          </div>
+        </div>
+      </div>
+
+    </div>
+  `;
+}
+
+/* ════════════════════════════════════════
+   NEXT DOSE BANNER
+════════════════════════════════════════ */
+const DOSE_TIMES = {
+  Morning:'08:00', Afternoon:'13:00', Night:'21:00'
+};
+
+function updateNextBanner(id) {
+  const banner = document.getElementById('nextBanner');
+  if (!id) { banner.style.display='none'; return; }
+  const p = loadPatient(id);
+
+  /* Find soonest pending dose */
+  const slots = [
+    { period:'Morning',   name:p.medMorning,   time:DOSE_TIMES.Morning },
+    { period:'Afternoon', name:p.medAfternoon, time:DOSE_TIMES.Afternoon },
+    { period:'Night',     name:p.medNight,     time:DOSE_TIMES.Night },
+  ].filter(s => s.name && s.name.toLowerCase()!=='none');
+
+  if (!slots.length) { banner.style.display='none'; return; }
+
+  const sorted = slots.sort((a,b)=>minutesUntil(a.time)-minutesUntil(b.time));
+  const next = sorted[0];
+  const mins = minutesUntil(next.time);
+
+  document.getElementById('nbMed').textContent = next.name;
+  document.getElementById('nbSub').textContent = `${next.period} · At ${next.time}`;
+  document.getElementById('nbCd').textContent  = fmtCd(mins);
+  banner.style.display = 'flex';
+}
+
+setInterval(()=>{ if(activeId) updateNextBanner(activeId); }, 30000);
+
+/* ════════════════════════════════════════
+   HEADER CHIP
+════════════════════════════════════════ */
+function updateHeaderChip(id) {
+  const el  = document.getElementById('hdrChip');
+  if (!id) {
+    el.innerHTML = `<span class="hdr-no-active">— No patient selected —</span>`;
+    return;
+  }
+  const p = loadPatient(id);
+  const isEmerg = p.alertState === 'emergency';
+  el.innerHTML = `
+    <div class="hdr-active-chip">
+      <div class="hdr-active-dot" style="${isEmerg?'background:var(--red);box-shadow:0 0 8px var(--red)':''}"></div>
+      <span class="hdr-active-id">${id}</span>
+      <span class="hdr-active-name">${p.name||'—'}</span>
+      ${isEmerg?`<span class="tag tag-red" style="font-size:9px">EMERG</span>`:''}
+    </div>`;
+}
+
+/* ════════════════════════════════════════
+   SELECT PATIENT
+════════════════════════════════════════ */
+function selectPatient(id, fromQR=false) {
+  if (!PATIENT_IDS.includes(id)) {
+    toast(`Unknown patient: ${id}`, 'error'); return;
+  }
+  activeId = id;
+
+  /* URL update */
+  const url = new URL(window.location.href);
+  url.searchParams.set('patient', id);
+  window.history.replaceState({}, '', url.toString());
+
+  /* Re-render everything */
+  buildQRCards();
+  renderForm(id);
+  renderDetail(id);
+  updateHeaderChip(id);
+  updateNextBanner(id);
+
+  const p = loadPatient(id);
+  document.title = `MediCare REV · ${p.name||id}`;
+
+  toast(fromQR
+    ? `📷 QR Scan → ${p.name||id} (${id})`
+    : `Active: ${p.name||id} (${id})`,
+    'ok');
+}
+
+/* ════════════════════════════════════════
+   SPARKLINE
+════════════════════════════════════════ */
+function drawSpark(data, color) {
+  const c = document.getElementById('hrCanvas');
+  if (!c) return;
+  const W = c.offsetWidth||200, H=32;
+  c.width=W; c.height=H;
+  const ctx=c.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  if (data.length<2) return;
+  const mn=Math.min(...data)-4, mx=Math.max(...data)+4;
+  const sx=i=>(i/(data.length-1))*W;
+  const sy=v=>H-((v-mn)/(mx-mn))*H;
+  ctx.beginPath();
+  ctx.moveTo(sx(0),sy(data[0]));
+  for(let i=1;i<data.length;i++) ctx.lineTo(sx(i),sy(data[i]));
+  ctx.strokeStyle=color; ctx.lineWidth=2; ctx.lineJoin='round'; ctx.stroke();
+  ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.closePath();
+  ctx.fillStyle=color+'20'; ctx.fill();
+}
+
+/* ════════════════════════════════════════
+   ESP32 POLL
+════════════════════════════════════════ */
+async function poll() {
+  try {
+    const res = await fetch(ESP_URL, { signal:AbortSignal.timeout(4000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    espOnline = true;
+    updateESPUI(data);
+    setESPPill('on','ESP32 Online');
+    document.getElementById('lastPollLabel').textContent = `Last: ${nowHM()}`;
+    document.getElementById('rawPre').textContent = JSON.stringify(data,null,2);
+    document.getElementById('rawTimestamp').textContent = nowHM();
+  } catch(err) {
+    espOnline = false;
+    setESPPill('err','Not Connected');
+    document.getElementById('lastPollLabel').textContent = `Error: ${nowHM()}`;
+    document.getElementById('rawPre').textContent =
+      `// ⚠ ESP32 Unreachable\n// URL: ${ESP_URL}\n// Error: ${err.message}\n\n// Showing simulated data.`;
+    clearVitals();
+  }
+}
+
+function setESPPill(state, label) {
+  const el = document.getElementById('espStatus');
+  el.className = `esp-status ${state}`;
+  document.getElementById('espStatusLabel').textContent = label;
+}
+
+function clearVitals() {
+  ['vb-hr','vb-box','vb-med','vb-alert','vb-next'].forEach(id=>{
+    const e=document.getElementById(id); if(e) e.className='vb s-idle';
+  });
+  ['v-hr','v-box','v-med','v-alert','v-next'].forEach(id=>{
+    const e=document.getElementById(id); if(e){e.textContent='—';e.className='vb-val';}
+  });
+  ['es-box','es-med','es-alert','es-next'].forEach(id=>{
+    const e=document.getElementById(id); if(e){e.textContent='—';e.className='esc-val idle';}
+  });
+}
+
+function setVB(id, state) {
+  const el=document.getElementById(id);
+  if(el) el.className=`vb s-${state}`;
+}
+
+function updateESPUI(d) {
+  const hr     = typeof d.hr==='number' ? d.hr : (typeof d.heartRate==='number'?d.heartRate:null);
+  const box    = (d.box||'').toUpperCase();
+  const med    = (d.medicine||d.med||'').toString();
+  const alertV = (d.alert||'').toUpperCase();
+  const next   = d.next || d.nextDose || null;
+
+  /* ── Heart Rate ── */
+  if (hr !== null) {
+    hrHistory.push(hr); if(hrHistory.length>30) hrHistory.shift();
+    const cls = hrClass(hr);
+    setVB('vb-hr', cls);
+    const el=document.getElementById('v-hr');
+    el.textContent=hr; el.className=`vb-val ${cls}`;
+    document.getElementById('dot-hr').className=`vb-status-dot ${cls}`;
+    document.getElementById('sub-hr').textContent=
+      hr>100?'⚠️ Tachycardia':hr<55?'⚠️ Bradycardia':'✅ Normal rhythm';
+    drawSpark(hrHistory, cls==='danger'?'#ef233c':cls==='warn'?'#ffb703':'#00e676');
+  }
+
+  /* ── Box ── */
+  const boxOk = box==='OPEN';
+  setVB('vb-box', boxOk?'ok':'idle');
+  const boxEl=document.getElementById('v-box');
+  boxEl.textContent=box||'—'; boxEl.className=`vb-val ${boxOk?'ok':''}`;
+  document.getElementById('dot-box').className=`vb-status-dot ${boxOk?'ok':''}`;
+  document.getElementById('sub-box').textContent=boxOk?'✅ Box opened':'📦 Box closed';
+  const esBox=document.getElementById('es-box');
+  esBox.textContent=box||'—'; esBox.className=`esc-val ${boxOk?'ok':'idle'}`;
+
+  /* ── Medicine ── */
+  const medLow=med.toLowerCase();
+  const medCls=medLow==='taken'?'ok':medLow==='missed'?'danger':medLow?'warn':'idle';
+  setVB('vb-med',medCls==='idle'?'idle':medCls);
+  const medEl=document.getElementById('v-med');
+  medEl.textContent=med||'—'; medEl.className=`vb-val ${medCls==='idle'?'':medCls}`;
+  document.getElementById('dot-med').className=`vb-status-dot ${medCls==='idle'?'':medCls}`;
+  document.getElementById('sub-med').textContent=
+    medLow==='taken'?'✅ Administered':medLow==='missed'?'🚨 Missed dose':med?'⏳ Pending':'—';
+  const esMed=document.getElementById('es-med');
+  esMed.textContent=med||'—'; esMed.className=`esc-val ${medCls}`;
+
+  /* ── Alert ── */
+  const alertOn=alertV==='ON'||alertV==='TRUE'||alertV==='1';
+  setVB('vb-alert',alertOn?'danger':'ok');
+  const alertEl=document.getElementById('v-alert');
+  alertEl.textContent=alertOn?'ON':'OFF'; alertEl.className=`vb-val ${alertOn?'danger':'ok'}`;
+  document.getElementById('dot-alert').className=`vb-status-dot ${alertOn?'danger':'ok'}`;
+  document.getElementById('sub-alert').textContent=alertOn?'🚨 Alert active!':'✅ All clear';
+  const esAlert=document.getElementById('es-alert');
+  esAlert.textContent=alertOn?'ON':'OFF'; esAlert.className=`esc-val ${alertOn?'danger':'ok'}`;
+
+  /* ── Next Dose ── */
+  if (next) {
+    setVB('vb-next','ok');
+    const nextEl=document.getElementById('v-next');
+    nextEl.textContent=next; nextEl.className='vb-val ok';
+    const mins=minutesUntil(next);
+    document.getElementById('dot-next').className='vb-status-dot ok';
+    document.getElementById('sub-next').textContent=`In ${fmtCd(mins)}`;
+    const esNext=document.getElementById('es-next');
+    esNext.textContent=next; esNext.className='esc-val warn';
+  }
+
+  /* Escalate active patient to emergency if alert fires */
+  if (alertOn && activeId) {
+    const p = loadPatient(activeId);
+    if (p.alertState !== 'emergency') {
+      p.alertState = 'emergency';
+      savePatient(activeId, p);
+      refreshQRCard(activeId);
+      updateHeaderChip(activeId);
+    }
+  }
+}
+
+/* ════════════════════════════════════════
+   URL PARAM AUTO-SELECTION
+════════════════════════════════════════ */
+function checkURL() {
+  const params = new URLSearchParams(window.location.search);
+  const pid    = (params.get('patient')||'').toUpperCase();
+  if (pid && PATIENT_IDS.includes(pid)) {
+    selectPatient(pid, true);
+  } else {
+    /* Default to ID001 */
+    selectPatient('ID001');
+  }
+}
+
+/* ════════════════════════════════════════
+   INIT
+════════════════════════════════════════ */
+function init() {
+  buildQRCards();
+  checkURL();
+  poll();
+  pollTimer = setInterval(poll, POLL_MS);
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
