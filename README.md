@@ -148,10 +148,8 @@ ESP32 → JSON → fetch() → Dashboard → UI Update
 
 ## Author
 
-Presanna S
+Presanna kumar S
 
 ---
 
-## License
 
-MIT License
