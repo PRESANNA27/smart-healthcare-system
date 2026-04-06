@@ -764,6 +764,54 @@ body::before {
 /* ══════════════════════════════════════════════
    RESPONSIVE
 ══════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════
+   ESP32 IP CONFIG WIDGET
+══════════════════════════════════════════════ */
+.esp-ip-cfg {
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  padding:10px 20px;
+  background:var(--ink-3);
+  border-bottom:1px solid rgba(0,180,216,.1);
+}
+.esp-ip-cfg-lbl {
+  font-family:var(--mono); font-size:9px; font-weight:500;
+  letter-spacing:2px; text-transform:uppercase;
+  color:var(--slate-4); white-space:nowrap; flex-shrink:0;
+}
+.esp-ip-input {
+  flex:1; min-width:200px; max-width:320px;
+  background:var(--ink);
+  border:1px solid var(--ink-5);
+  border-radius:var(--r);
+  color:var(--cyan);
+  font-family:var(--mono); font-size:12px;
+  padding:7px 12px;
+  outline:none;
+  transition: border-color var(--trans);
+}
+.esp-ip-input:focus { border-color:var(--cyan); box-shadow:0 0 0 3px rgba(0,180,216,.1); }
+.esp-ip-input::placeholder { color:var(--slate-4); }
+.esp-ip-save {
+  background:var(--cyan); color:var(--ink);
+  border:none; border-radius:var(--r);
+  font-family:var(--display); font-size:11px; font-weight:800;
+  letter-spacing:1px; text-transform:uppercase;
+  padding:7px 16px; cursor:pointer;
+  transition: all var(--trans); white-space:nowrap; flex-shrink:0;
+}
+.esp-ip-save:hover { background:#38d4f5; transform:translateY(-1px); box-shadow:0 4px 14px rgba(0,180,216,.3); }
+.esp-ip-save:active { transform:translateY(0); }
+.esp-ip-saved {
+  font-family:var(--mono); font-size:10px; color:var(--acid);
+  opacity:0; transition:opacity .3s; white-space:nowrap;
+}
+.esp-ip-saved.show { opacity:1; }
+.esp-ip-current {
+  font-family:var(--mono); font-size:10px; color:var(--slate-4);
+  white-space:nowrap; display:flex; align-items:center; gap:5px;
+}
+.esp-ip-current span { color:var(--cyan); }
+
 @media (max-width:1200px) {
   .work-area { grid-template-columns:360px 1fr; }
   .vitals-bar { grid-template-columns:repeat(3,1fr); }
@@ -902,10 +950,21 @@ body::before {
       <div class="esp-top-bar">
         <div class="esp-top-left">
           <div class="esp-top-title">Live Feed</div>
-          <div class="esp-url-chip">http://10.222.139.174</div>
+          <div class="esp-url-chip" id="espUrlChip">—</div>
           <div class="tag tag-cyan" id="pollTag">● Polling 2s</div>
         </div>
         <div class="esp-poll-lbl" id="lastPollLabel">—</div>
+      </div>
+
+      <!-- IP Config Row -->
+      <div class="esp-ip-cfg">
+        <div class="esp-ip-cfg-lbl">🔌 ESP32 IP Address</div>
+        <input class="esp-ip-input" id="espIpInput"
+               placeholder="http://192.168.x.x"
+               onkeydown="if(event.key==='Enter')saveEspUrl()"/>
+        <button class="esp-ip-save" onclick="saveEspUrl()">💾 Save &amp; Connect</button>
+        <div class="esp-ip-saved" id="espIpSaved">✓ Saved</div>
+        <div class="esp-ip-current">Active: <span id="espIpActive">—</span></div>
       </div>
 
       <!-- Vitals bar -->
@@ -989,7 +1048,7 @@ body::before {
 /* ════════════════════════════════════════
    CONFIG
 ════════════════════════════════════════ */
-const ESP_URL     = 'http://10.222.139.174';
+let ESP_URL = localStorage.getItem('esp32_url') || 'http://10.222.139.174'; // reads saved IP or falls back to default
 const BASE_URL    = window.location.origin + window.location.pathname; // dynamic — works on any host/port
 const POLL_MS     = 2000;
 const PATIENT_IDS = ['ID001', 'ID002'];
@@ -1665,11 +1724,58 @@ function checkURL() {
 }
 
 /* ════════════════════════════════════════
+   ESP32 URL CONFIG
+════════════════════════════════════════ */
+function syncEspUrlDisplay() {
+  /* Populate input with current URL */
+  const inp = document.getElementById('espIpInput');
+  if (inp) inp.value = ESP_URL;
+  /* Update chip and active label */
+  const chip   = document.getElementById('espUrlChip');
+  const active = document.getElementById('espIpActive');
+  if (chip)   chip.textContent   = ESP_URL;
+  if (active) active.textContent = ESP_URL;
+  /* Update raw pre placeholder if no data yet */
+  const raw = document.getElementById('rawPre');
+  if (raw && raw.textContent.includes('10.222.139.174')) {
+    raw.textContent = `// Waiting for ESP32…\n// URL: ${ESP_URL}\n// Poll interval: 2 seconds`;
+  }
+}
+
+function saveEspUrl() {
+  const inp = document.getElementById('espIpInput');
+  const val = (inp ? inp.value : '').trim();
+  if (!val) { toast('Enter a valid URL first', 'warn'); return; }
+
+  /* Normalise: ensure it starts with http */
+  const url = val.startsWith('http') ? val : `http://${val}`;
+  inp.value = url;
+
+  /* Persist and apply */
+  localStorage.setItem('esp32_url', url);
+  ESP_URL = url;
+  syncEspUrlDisplay();
+
+  /* Visual feedback */
+  const saved = document.getElementById('espIpSaved');
+  if (saved) { saved.classList.add('show'); setTimeout(()=>saved.classList.remove('show'), 2500); }
+
+  /* Restart poll immediately with new URL */
+  clearInterval(pollTimer);
+  clearVitals();
+  poll();
+  pollTimer = setInterval(poll, POLL_MS);
+
+  toast(`ESP32 → ${url}`, 'ok');
+}
+
+/* ════════════════════════════════════════
    INIT
 ════════════════════════════════════════ */
 function init() {
   buildQRCards();
   checkURL();
+  syncEspUrlDisplay(); // populate IP input + chip from current ESP_URL
   poll();
   pollTimer = setInterval(poll, POLL_MS);
 }
