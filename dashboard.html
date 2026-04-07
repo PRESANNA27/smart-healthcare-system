@@ -958,13 +958,30 @@ body::before {
 
       <!-- IP Config Row -->
       <div class="esp-ip-cfg">
-        <div class="esp-ip-cfg-lbl">🔌 ESP32 IP Address</div>
+        <div class="esp-ip-cfg-lbl">🔌 ESP32 URL</div>
         <input class="esp-ip-input" id="espIpInput"
                placeholder="http://192.168.x.x"
                onkeydown="if(event.key==='Enter')saveEspUrl()"/>
         <button class="esp-ip-save" onclick="saveEspUrl()">💾 Save &amp; Connect</button>
         <div class="esp-ip-saved" id="espIpSaved">✓ Saved</div>
         <div class="esp-ip-current">Active: <span id="espIpActive">—</span></div>
+
+        <div style="width:1px;height:28px;background:var(--ink-5);flex-shrink:0;margin:0 4px"></div>
+
+        <div class="esp-ip-cfg-lbl" style="color:var(--cyan);white-space:nowrap">📱 QR Base URL</div>
+        <input class="esp-ip-input" id="qrIpInput" type="text"
+               placeholder="Auto-detecting LAN IP…"
+               title="This URL is encoded into QR codes. Must be your LAN IP (e.g. http://192.168.1.5:8000/dashboard.html) so phones on the same Wi-Fi can open it."
+               onkeydown="if(event.key==='Enter')saveQRUrl()"
+               style="border-color:rgba(0,180,216,.25);color:var(--cyan)"/>
+        <button class="esp-ip-save" onclick="saveQRUrl()"
+                style="background:var(--ink-5);color:var(--cyan);border:1px solid rgba(0,180,216,.3)">
+          📷 Set QR IP
+        </button>
+        <div class="esp-ip-saved" id="qrIpSaved">✓ Updated</div>
+        <div class="esp-ip-current" style="font-size:9px">
+          QR→ <span id="qrUrlChip" style="color:var(--cyan)">detecting…</span>
+        </div>
       </div>
 
       <!-- Vitals bar -->
@@ -1025,7 +1042,7 @@ body::before {
             <span id="rawTimestamp" style="color:var(--slate-4)">—</span>
           </div>
           <pre class="esp-raw-pre" id="rawPre">// Waiting for ESP32…
-// URL: http://10.222.139.174
+// URL: (set ESP32 URL below)
 // Poll interval: 2 seconds</pre>
         </div>
       </div>
@@ -1048,10 +1065,97 @@ body::before {
 /* ════════════════════════════════════════
    CONFIG
 ════════════════════════════════════════ */
-let ESP_URL = localStorage.getItem('esp32_url') || 'http://10.222.139.174'; // reads saved IP or falls back to default
-const BASE_URL    = window.location.origin + window.location.pathname; // dynamic — works on any host/port
+let ESP_URL = localStorage.getItem('esp32_url') || '';
 const POLL_MS     = 2000;
 const PATIENT_IDS = ['ID001', 'ID002'];
+
+/* ── QR Base URL (LAN-aware) ─────────────────────────────────────────────
+   window.location.origin is fine when you open the page via LAN IP directly
+   (e.g. http://192.168.1.5:8000).  But if you opened via localhost the QR
+   would encode "localhost" which the phone can't reach.
+   Strategy:
+     1. Use saved override from localStorage (user can set it manually).
+     2. If origin is NOT localhost/127.x, use it as-is — it's already a LAN IP.
+     3. Otherwise try WebRTC ICE candidate trick to discover the LAN IP.
+     4. Fall back to origin if WebRTC yields nothing.
+─────────────────────────────────────────────────────────────────────── */
+const _PAGE_PATH = window.location.pathname;
+const _ORIGIN    = window.location.origin;           // e.g. http://localhost:8000
+const _PORT      = window.location.port || '8000';
+
+// Mutable; rebuilt once LAN IP is discovered
+let QR_BASE_URL  = localStorage.getItem('qr_base_url')
+                   || _ORIGIN + _PAGE_PATH;           // initial best-guess
+
+function _isLocalhost(origin) {
+  return /localhost|127\.|0\.0\.0\.0/.test(origin);
+}
+
+async function detectLANIP() {
+  return new Promise(resolve => {
+    try {
+      const pc = new RTCPeerConnection({ iceServers: [] });
+      pc.createDataChannel('');
+      pc.createOffer().then(o => pc.setLocalDescription(o)).catch(() => resolve(null));
+      const found = new Set();
+      const timer = setTimeout(() => { pc.close(); resolve(null); }, 3000);
+      pc.onicecandidate = evt => {
+        if (!evt || !evt.candidate || !evt.candidate.candidate) {
+          clearTimeout(timer); pc.close(); resolve(found.size ? [...found][0] : null); return;
+        }
+        const m = evt.candidate.candidate.match(/(\d+\.\d+\.\d+\.\d+)/);
+        if (m && !m[1].startsWith('127.') && !m[1].startsWith('169.254')) {
+          found.add(m[1]);
+        }
+      };
+    } catch(e) { resolve(null); }
+  });
+}
+
+async function initQRBaseURL() {
+  // If user saved a manual override → use it immediately
+  if (localStorage.getItem('qr_base_url')) {
+    QR_BASE_URL = localStorage.getItem('qr_base_url');
+    syncQRUrlDisplay(); return;
+  }
+  // If origin is already a LAN IP → nothing to do
+  if (!_isLocalhost(_ORIGIN)) {
+    QR_BASE_URL = _ORIGIN + _PAGE_PATH;
+    syncQRUrlDisplay(); return;
+  }
+  // Try WebRTC
+  const ip = await detectLANIP();
+  if (ip) {
+    QR_BASE_URL = `http://${ip}:${_PORT}${_PAGE_PATH}`;
+  } else {
+    QR_BASE_URL = _ORIGIN + _PAGE_PATH; // best fallback
+  }
+  syncQRUrlDisplay();
+  // Rebuild QR cards now that we have the correct IP
+  buildQRCards();
+}
+
+function syncQRUrlDisplay() {
+  const inp = document.getElementById('qrIpInput');
+  if (inp) inp.value = QR_BASE_URL;
+  const chip = document.getElementById('qrUrlChip');
+  if (chip) chip.textContent = QR_BASE_URL;
+}
+
+function saveQRUrl() {
+  const inp = document.getElementById('qrIpInput');
+  const val = (inp ? inp.value : '').trim();
+  if (!val) { toast('Enter a valid QR base URL', 'warn'); return; }
+  const url = val.startsWith('http') ? val : `http://${val}`;
+  if (inp) inp.value = url;
+  localStorage.setItem('qr_base_url', url);
+  QR_BASE_URL = url;
+  syncQRUrlDisplay();
+  buildQRCards(); // regenerate all QR codes with new URL
+  const saved = document.getElementById('qrIpSaved');
+  if (saved) { saved.classList.add('show'); setTimeout(()=>saved.classList.remove('show'), 2500); }
+  toast(`QR URL → ${url}`, 'ok');
+}
 
 /* Default scaffold loaded when no localStorage data exists */
 const DEFAULTS = {
@@ -1183,7 +1287,7 @@ function buildQRCards() {
 
   PATIENT_IDS.forEach(id => {
     const p = loadPatient(id);
-    const url = `${BASE_URL}?patient=${id}`;
+    const url = `${QR_BASE_URL}?patient=${id}`;
     const isActive = id === activeId;
     const isEmerg  = p.alertState === 'emergency';
     const cardCls  = isActive ? (isEmerg ? 'active-emerg' : 'active') : '';
@@ -1730,15 +1834,13 @@ function syncEspUrlDisplay() {
   /* Populate input with current URL */
   const inp = document.getElementById('espIpInput');
   if (inp) inp.value = ESP_URL;
-  /* Update chip and active label */
-  const chip   = document.getElementById('espUrlChip');
+  /* Update active label */
   const active = document.getElementById('espIpActive');
-  if (chip)   chip.textContent   = ESP_URL;
-  if (active) active.textContent = ESP_URL;
+  if (active) active.textContent = ESP_URL || '(not set)';
   /* Update raw pre placeholder if no data yet */
   const raw = document.getElementById('rawPre');
-  if (raw && raw.textContent.includes('10.222.139.174')) {
-    raw.textContent = `// Waiting for ESP32…\n// URL: ${ESP_URL}\n// Poll interval: 2 seconds`;
+  if (raw && (raw.textContent.includes('10.') || raw.textContent.includes('set ESP32') || raw.textContent.includes('not set'))) {
+    raw.textContent = `// Waiting for ESP32…\n// URL: ${ESP_URL || '(not set)'}\n// Poll interval: 2 seconds`;
   }
 }
 
@@ -1776,6 +1878,7 @@ function init() {
   buildQRCards();
   checkURL();
   syncEspUrlDisplay(); // populate IP input + chip from current ESP_URL
+  initQRBaseURL();     // detect LAN IP and update QR codes (async, rebuilds cards when done)
   poll();
   pollTimer = setInterval(poll, POLL_MS);
 }
